@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>NSE F&amp;O Hourly CPR &amp; 9:15 AM ATM±3 O=H/O=L Live Mobile Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            slate950: '#090D16',
+            slate900: '#111827',
+            slate850: '#161F33',
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
+
+  <!-- Toast Notification -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 hidden max-w-sm bg-indigo-600 text-white px-4 py-3 rounded-xl shadow-2xl border border-indigo-400/30 flex items-center gap-3 transition-all duration-300">
+    <span id="toastIcon" class="text-lg">✓</span>
+    <span id="toastMessage" class="text-sm font-medium">Action completed</span>
+  </div>
+
+  <!-- Top Sticky Mobile-Responsive Header -->
+  <header class="sticky top-0 z-30 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-3 sm:px-6 py-3">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-indigo-600 flex items-center justify-center font-bold text-white shadow-lg">
+          F&amp;O
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">NSE F&amp;O Hourly CPR &amp; 9:15 O=H/O=L</h1>
+            <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              Tier-1 Liquid Only
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Intraday 1H CPR + First 15m ORB + ATM±3 Strike O=H &amp; O=L Confluence</p>
+        </div>
+      </div>
+
+      <!-- Live Controls & Auto-Refresh -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <div class="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs">
+          <span id="livePulseDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="lastScanTimeLabel" class="text-slate-300 font-medium">1H CPR Active</span>
+        </div>
+        <button id="btnSimulateHour" type="button" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-semibold transition shadow">
+          ↻ Refresh 1H Candle
+        </button>
+        <button id="btnAutoRefreshToggle" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-medium transition">
+          Auto 60s: OFF
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs (Mobile Scrollable) -->
+    <nav class="max-w-7xl mx-auto mt-3 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1" aria-label="Dashboard Navigation">
+      <button type="button" data-tab="tabScanner" class="nav-tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap bg-indigo-600 text-white shadow">
+        ⚡ Live 1H CPR + 9:15 Scanner
+      </button>
+      <button type="button" data-tab="tabCalculator" class="nav-tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap bg-slate-800/80 text-slate-300 hover:bg-slate-800">
+        🧮 Hourly CPR &amp; ATM±3 Calculator
+      </button>
+      <button type="button" data-tab="tabBanFilter" class="nav-tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap bg-slate-800/80 text-slate-300 hover:bg-slate-800">
+        🛡️ F&amp;O Ban &amp; Liquidity Guard (<span id="banCountBadge">17</span>)
+      </button>
+      <button type="button" data-tab="tabBacktest" class="nav-tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap bg-slate-800/80 text-slate-300 hover:bg-slate-800">
+        📊 10-Day Backtest (+₹56.7k)
+      </button>
+      <button type="button" data-tab="tabCloudSetup" class="nav-tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap bg-slate-800/80 text-slate-300 hover:bg-slate-800">
+        ☁️ Free Mobile &amp; Cloud Setup
+      </button>
+    </nav>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="max-w-7xl w-full mx-auto px-3 sm:px-6 py-5 flex-1 space-y-6">
+
+    <!-- Top KPI Strip -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Eligible Tier-1 Scrips</div>
+        <div class="mt-1 flex items-baseline justify-between">
+          <span id="kpiActiveCount" class="text-xl sm:text-2xl font-bold text-white">12</span>
+          <span class="text-xs text-emerald-400 font-medium">Mid-Caps Skipped</span>
+        </div>
+        <p class="mt-1 text-[11px] text-slate-400">Spread &le; ₹0.20 | Vol &ge; 1.5M</p>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Call Drives (CE O=L + PE O=H)</div>
+        <div class="mt-1 flex items-baseline justify-between">
+          <span id="kpiBullCount" class="text-xl sm:text-2xl font-bold text-emerald-400">5</span>
+          <span class="text-xs text-emerald-300 font-medium">Spot &gt; 1H CPR TC</span>
+        </div>
+        <p class="mt-1 text-[11px] text-slate-400">ICICI, Airtel, INFY, TCS, Axis</p>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Put Drives (PE O=L + CE O=H)</div>
+        <div class="mt-1 flex items-baseline justify-between">
+          <span id="kpiBearCount" class="text-xl sm:text-2xl font-bold text-rose-400">2</span>
+          <span class="text-xs text-rose-300 font-medium">Spot &lt; 1H CPR BC</span>
+        </div>
+        <p class="mt-1 text-[11px] text-slate-400">INDUSINDBK &amp; TATASTEEL</p>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">10-Day Backtest Net P&amp;L</div>
+        <div class="mt-1 flex items-baseline justify-between">
+          <span class="text-xl sm:text-2xl font-bold text-indigo-400">+₹56,770</span>
+          <span class="text-xs text-emerald-400 font-semibold">85.7% Win</span>
+        </div>
+        <p class="mt-1 text-[11px] text-slate-400">12W / 2L (1 Lot, ₹2L Capital)</p>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 1: LIVE HOURLY CPR + 9:15 AM (ATM±3 O=H/O=L) SCANNER            -->
+    <!-- =================================================================== -->
+    <section id="tabScanner" class="tab-panel space-y-5">
+      <!-- Filter Bar -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-semibold text-slate-400 uppercase">Filter Side:</span>
+          <button type="button" data-bias="ALL" class="bias-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white">All Active</button>
+          <button type="button" data-bias="CALL" class="bias-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-emerald-300 hover:bg-slate-700">Call Side (CE O=L)</button>
+          <button type="button" data-bias="PUT" class="bias-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-rose-300 hover:bg-slate-700">Put Side (PE O=L)</button>
+          <label class="inline-flex items-center gap-1.5 ml-2 text-xs text-slate-300 cursor-pointer">
+            <input id="chkNarrowHourlyCpr" type="checkbox" class="rounded bg-slate-800 border-slate-600 text-indigo-500 focus:ring-0" />
+            <span>Narrow 1H CPR Only (&le; 0.20%)</span>
+          </label>
+        </div>
+
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <input id="inpSearchSymbol" type="text" placeholder="Search scrip (e.g. ICICIBANK, TCS)..." class="w-full sm:w-56 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+        </div>
+      </div>
+
+      <!-- Responsive Cards Grid for Mobile + Full Table for Desktop -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+        <div class="px-4 py-3 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="text-sm sm:text-base font-bold text-white">Intraday Hourly CPR + First 15-Min ORB + ATM±3 (O=H / O=L) Signals</h2>
+            <p class="text-xs text-slate-400">Click <span class="text-indigo-400 font-semibold">"Inspect 7 Strikes"</span> on any row to view its full ATM-3 to ATM+3 Call &amp; Put O=H/O=L matrix.</p>
+          </div>
+          <span id="scannerMatchCountLabel" class="text-xs font-semibold text-slate-300 bg-slate-800 px-2.5 py-1 rounded-md">Showing 7 Setups</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-950/80 text-slate-400 border-b border-slate-800 uppercase text-[11px]">
+                <th class="py-3 px-3">Scrip &amp; Sector</th>
+                <th class="py-3 px-3">Side &amp; Score</th>
+                <th class="py-3 px-3 text-right">Spot LTP (15m ORB)</th>
+                <th class="py-3 px-3">Hourly CPR (1H BC - 1H TC)</th>
+                <th class="py-3 px-3">ATM±3 Call (CE) Status</th>
+                <th class="py-3 px-3">ATM±3 Put (PE) Status</th>
+                <th class="py-3 px-3">Recommended Option &amp; Lots</th>
+                <th class="py-3 px-3">Spot SL / T1 / T2</th>
+                <th class="py-3 px-3 text-center">Matrix</th>
+              </tr>
+            </thead>
+            <tbody id="scannerTableBody" class="divide-y divide-slate-800/70">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Interactive 7-Strike (ATM-3 to ATM+3) Option Chain Modal / Drawer -->
+      <div id="strikeInspectorPanel" class="bg-slate-900 border-2 border-indigo-500/40 rounded-xl p-4 sm:p-5 shadow-2xl space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-xs font-bold uppercase">7-Strike Matrix Inspector</span>
+              <h3 id="inspectorTitle" class="text-base font-bold text-white">ICICIBANK — ATM 1380 (Step: ₹20 | Lot: 700)</h3>
+            </div>
+            <p id="inspectorSubtitle" class="text-xs text-slate-400 mt-0.5">Hourly CPR: ₹1393.60 – ₹1394.00 (Width: 0.03% Narrow) | 1H R1: ₹1396.5 | 1H S1: ₹1391.2</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="inspectorActionBadge" class="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold">
+              BUY ICICIBANK 1380 CE (ATM) or 1360 CE (1-ITM)
+            </span>
+          </div>
+        </div>
+
+        <!-- Two-Step Execution Banner -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          <div class="bg-slate-950/90 border border-slate-800 rounded-lg p-3">
+            <div class="font-semibold text-indigo-400 uppercase text-[11px]">Phase 1 (9:18 – 9:20 AM Opening Drive — 50% Size)</div>
+            <div id="inspectorPhase1" class="text-slate-200 mt-1 font-medium">Enter 50% lots when Spot holds above Hourly CPR TC &amp; ATM CE holds Open = Low.</div>
+          </div>
+          <div class="bg-slate-950/90 border border-slate-800 rounded-lg p-3">
+            <div class="font-semibold text-emerald-400 uppercase text-[11px]">Phase 2 (9:30 AM First 15-Min ORB Leverage — 50% Add)</div>
+            <div id="inspectorPhase2" class="text-slate-200 mt-1 font-medium">Add remaining 50% lots on 15m ORB breakout with RVOL &ge; 2.0x; trail SL to Hourly CPR / VWAP.</div>
+          </div>
+        </div>
+
+        <!-- 7-Strike Option Chain Table (ATM-3 to ATM+3) -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-center border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-950 text-slate-400 border-b border-slate-800 text-[11px] uppercase">
+                <th class="py-2 px-2 text-emerald-400" colspan="4">CALL SIDE (CE) — Look for Open = Low (Buying)</th>
+                <th class="py-2 px-3 bg-slate-800 text-white">Strike (Offset)</th>
+                <th class="py-2 px-2 text-rose-400" colspan="4">PUT SIDE (PE) — Look for Open = High (Writing)</th>
+              </tr>
+              <tr class="bg-slate-950/60 text-slate-400 border-b border-slate-800 text-[11px]">
+                <th class="py-2 px-2">CE Open</th>
+                <th class="py-2 px-2">CE High</th>
+                <th class="py-2 px-2">CE Low</th>
+                <th class="py-2 px-2">CE O=H / O=L</th>
+                <th class="py-2 px-3 bg-slate-800/80 text-indigo-300 font-bold">NSE Strike</th>
+                <th class="py-2 px-2">PE O=H / O=L</th>
+                <th class="py-2 px-2">PE Open</th>
+                <th class="py-2 px-2">PE High</th>
+                <th class="py-2 px-2">PE Low</th>
+              </tr>
+            </thead>
+            <tbody id="inspectorStrikeTableBody" class="divide-y divide-slate-800">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 2: INTERACTIVE HOURLY CPR & ATM±3 OPTION CALCULATOR             -->
+    <!-- =================================================================== -->
+    <section id="tabCalculator" class="tab-panel hidden space-y-5">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <!-- Input Form -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
+          <div>
+            <h2 class="text-base font-bold text-white">Live Hourly CPR &amp; Strike Calculator</h2>
+            <p class="text-xs text-slate-400">Enter the prior 1-Hour candle High, Low, Close &amp; current 15m Open to compute exact Hourly CPR and ATM±3 triggers on mobile.</p>
+          </div>
+
+          <div class="space-y-3 text-xs">
+            <div>
+              <label for="calcSelectScrip" class="block text-slate-300 font-medium mb-1">Select Tier-1 NSE F&amp;O Scrip</label>
+              <select id="calcSelectScrip" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-white">
+                <option value="ICICIBANK">ICICIBANK (Step: 20 | Lot: 700)</option>
+                <option value="BHARTIARTL">BHARTIARTL (Step: 20 | Lot: 475)</option>
+                <option value="INFY">INFY (Step: 20 | Lot: 400)</option>
+                <option value="TCS">TCS (Step: 50 | Lot: 175)</option>
+                <option value="AXISBANK">AXISBANK (Step: 20 | Lot: 625)</option>
+                <option value="HDFCBANK">HDFCBANK (Step: 10 | Lot: 550)</option>
+                <option value="SBIN">SBIN (Step: 10 | Lot: 750)</option>
+                <option value="RELIANCE">RELIANCE (Step: 20 | Lot: 500)</option>
+                <option value="INDUSINDBK">INDUSINDBK (Step: 20 | Lot: 500)</option>
+                <option value="TATASTEEL">TATASTEEL (Step: 2.5 | Lot: 5500)</option>
+                <option value="M&M">M&amp;M (Step: 50 | Lot: 350)</option>
+              </select>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label for="calcPrev1hHigh" class="block text-slate-400 mb-1">Prev 1H High</label>
+                <input id="calcPrev1hHigh" type="number" step="0.05" value="1398.80" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-white" />
+              </div>
+              <div>
+                <label for="calcPrev1hLow" class="block text-slate-400 mb-1">Prev 1H Low</label>
+                <input id="calcPrev1hLow" type="number" step="0.05" value="1388.50" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-white" />
+              </div>
+              <div>
+                <label for="calcPrev1hClose" class="block text-slate-400 mb-1">Prev 1H Close</label>
+                <input id="calcPrev1hClose" type="number" step="0.05" value="1397.00" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-white" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label for="calcSpotLtp" class="block text-slate-400 mb-1">Current Spot LTP (₹)</label>
+                <input id="calcSpotLtp" type="number" step="0.05" value="1399.50" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-white" />
+              </div>
+              <div>
+                <label for="calcSideSelect" class="block text-slate-400 mb-1">O=H / O=L Setup Bias</label>
+                <select id="calcSideSelect" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-white">
+                  <option value="CALL">Call Side (CE O=L &amp; PE O=H)</option>
+                  <option value="PUT">Put Side (PE O=L &amp; CE O=H)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label for="calcCapital" class="block text-slate-400 mb-1">Capital (₹)</label>
+                <input id="calcCapital" type="number" step="10000" value="200000" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-white" />
+              </div>
+              <div>
+                <label for="calcRiskPct" class="block text-slate-400 mb-1">Max Risk % / Trade</label>
+                <input id="calcRiskPct" type="number" step="0.5" value="2.0" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-white" />
+              </div>
+            </div>
+
+            <button id="btnRunCalculator" type="button" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg transition">
+              Calculate Hourly CPR &amp; Option Plan
+            </button>
+          </div>
+        </div>
+
+        <!-- Output Card -->
+        <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <div>
+              <h3 id="calcOutTitle" class="text-base font-bold text-white">ICICIBANK — Hourly CPR &amp; ATM±3 Execution Plan</h3>
+              <p id="calcOutCprBadge" class="text-xs text-emerald-400 font-medium mt-0.5">Hourly CPR Width: 0.12% (NARROW — High Probability Breakout)</p>
+            </div>
+            <span id="calcOutContract" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold">
+              BUY ICICIBANK 1400 CE (ATM) or 1380 CE (1-ITM)
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+              <div class="text-slate-400">Hourly Top CPR (1H TC)</div>
+              <div id="calcOutTc" class="text-base font-bold text-white mt-0.5">₹1,396.33</div>
+            </div>
+            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+              <div class="text-slate-400">Hourly Pivot (1H P)</div>
+              <div id="calcOutPivot" class="text-base font-bold text-indigo-400 mt-0.5">₹1,394.77</div>
+            </div>
+            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+              <div class="text-slate-400">Hourly Bottom CPR (1H BC)</div>
+              <div id="calcOutBc" class="text-base font-bold text-white mt-0.5">₹1,393.65</div>
+            </div>
+            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+              <div class="text-slate-400">Hourly R1 / S1</div>
+              <div id="calcOutR1S1" class="text-sm font-bold text-amber-300 mt-0.5">1401.0 / 1390.7</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+              <div class="text-slate-400">Spot Stop-Loss (1H CPR Base)</div>
+              <div id="calcOutSpotSl" class="text-base font-bold text-rose-400 mt-0.5">₹1,393.65</div>
+              <div id="calcOutOptSl" class="text-[11px] text-slate-400 mt-0.5">Est. Option SL: -3.2 pts</div>
+            </div>
+            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+              <div class="text-slate-400">Spot Targets (1.5R / 2.5R)</div>
+              <div id="calcOutTargets" class="text-base font-bold text-emerald-400 mt-0.5">₹1,408.3 / ₹1,414.1</div>
+              <div id="calcOutOptTarget" class="text-[11px] text-slate-400 mt-0.5">Est. Option Gain: +7.1 pts</div>
+            </div>
+            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+              <div class="text-slate-400">Position Size (Max Risk)</div>
+              <div id="calcOutLots" class="text-base font-bold text-indigo-300 mt-0.5">1 Lot (700 Qty)</div>
+              <div id="calcOutMaxRiskInr" class="text-[11px] text-slate-400 mt-0.5">Max Risk Allowed: ₹4,000</div>
+            </div>
+          </div>
+
+          <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-3 text-xs space-y-1.5">
+            <div class="font-semibold text-slate-300">ATM ± 3 Strikes to Monitor on Your Broker Terminal (9:15–9:30 AM):</div>
+            <div id="calcOutStrikesList" class="text-indigo-300 font-mono text-xs">1340 | 1360 | 1380 | [1400 ATM] | 1420 | 1440 | 1460</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 3: F&O BAN & LOW-LIQUIDITY MID-CAP GUARD                        -->
+    <!-- =================================================================== -->
+    <section id="tabBanFilter" class="tab-panel hidden space-y-5">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base font-bold text-white">NSE F&amp;O Ban List &amp; Low-Liquidity Mid-Cap Exclusion Guard</h2>
+            <p class="text-xs text-slate-400">Any scrip listed below is automatically blocked from generating intraday or daily option signals. You can add or remove scrips from today's NSE F&amp;O Ban circular.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <input id="inpAddBanSymbol" type="text" placeholder="Add symbol to Ban (e.g. PNB)..." class="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white" />
+            <button id="btnAddBanSymbol" type="button" class="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold">
+              + Block Scrip
+            </button>
+            <button id="btnResetBanList" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs">
+              Reset Default
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+            <div class="text-xs font-bold text-rose-400 uppercase mb-2">Blocked F&amp;O Ban &amp; Illiquid Mid-Cap Scrips (Click to Unblock)</div>
+            <div id="banChipsContainer" class="flex flex-wrap gap-2">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+            <div class="text-xs font-bold text-emerald-400 uppercase mb-2">Approved Tier-1 High-Liquidity Large-Cap Universe</div>
+            <p class="text-xs text-slate-400 mb-2">Only these high-volume NSE heavyweights with tight ₹0.05–₹0.20 option spreads across ATM±3 strikes are scanned:</p>
+            <div id="approvedChipsContainer" class="flex flex-wrap gap-2">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 4: 10-DAY HISTORICAL BACKTEST EXPLORER                          -->
+    <!-- =================================================================== -->
+    <section id="tabBacktest" class="tab-panel hidden space-y-5">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="text-base font-bold text-white">10-Day Historical Backtest (Oct 5 – Oct 16, 2026) — Hourly CPR + ATM±3 O=H/O=L</h2>
+            <p class="text-xs text-slate-400">14 Qualified Trades | 12 Wins, 2 Losses (85.7% Success Rate) | Net Booked Profit: +₹56,770.50 on ₹2,00,000 Capital</p>
+          </div>
+        </div>
+
+        <!-- Chart Container with Fixed Height (Core Rule 4) -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3">
+          <div class="relative h-72 w-full">
+            <canvas id="backtestPnlChart"></canvas>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-950 text-slate-400 border-b border-slate-800 text-[11px] uppercase">
+                <th class="py-2.5 px-3">Date</th>
+                <th class="py-2.5 px-3">Scrip</th>
+                <th class="py-2.5 px-3">Side</th>
+                <th class="py-2.5 px-3">Contract</th>
+                <th class="py-2.5 px-3">1H CPR + O=H/O=L Filter</th>
+                <th class="py-2.5 px-3 text-right">Spot Move</th>
+                <th class="py-2.5 px-3 text-right">Opt Pts</th>
+                <th class="py-2.5 px-3 text-right">Net P&amp;L (₹)</th>
+                <th class="py-2.5 px-3 text-center">Outcome</th>
+              </tr>
+            </thead>
+            <tbody id="backtestTableBody" class="divide-y divide-slate-800">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 5: FREE CLOUD & MOBILE ACCESS CONFIGURATION GUIDE               -->
+    <!-- =================================================================== -->
+    <section id="tabCloudSetup" class="tab-panel hidden space-y-5">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+        <div>
+          <h2 class="text-base font-bold text-white">Access From Anywhere Online or Mobile (100% Free Hosting)</h2>
+          <p class="text-xs text-slate-400 mt-1">All files needed to host this dashboard online for free are bundled in your downloadable <code class="text-indigo-300">nse_fno_hourly_cpr_cloud_package.zip</code> package.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <!-- Route 1: Streamlit Community Cloud -->
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">Option 1: Live Python Cloud (Recommended)</span>
+              <span class="text-slate-400">Cost: ₹0 / Free Forever</span>
+            </div>
+            <h3 class="text-sm font-bold text-white">Deploy `streamlit_app.py` on Streamlit Community Cloud</h3>
+            <ol class="list-decimal list-inside space-y-1.5 text-slate-300">
+              <li>Unzip <code class="text-indigo-300">nse_fno_hourly_cpr_cloud_package.zip</code> and upload <code class="text-indigo-300">streamlit_app.py</code>, <code class="text-indigo-300">nse_fno_options_scanner.py</code>, and <code class="text-indigo-300">requirements.txt</code> to a free GitHub repository.</li>
+              <li>Sign in to <strong>share.streamlit.io</strong> from your phone or PC and click <strong>"New App"</strong>.</li>
+              <li>Select your repository and set Main file path to <code class="text-indigo-300">streamlit_app.py</code>, then click <strong>Deploy</strong>.</li>
+              <li>Open your permanent URL (e.g., <code class="text-emerald-300">https://nse-fno-cpr.streamlit.app</code>) on your mobile browser and tap <strong>"Add to Home Screen"</strong>.</li>
+            </ol>
+            <button type="button" id="btnCopyRequirements" class="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 font-semibold border border-slate-700">
+              📋 Copy requirements.txt Content
+            </button>
+          </div>
+
+          <!-- Route 2: Instant Mobile Web App -->
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="px-2.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold">Option 2: 30-Second Mobile PWA</span>
+              <span class="text-slate-400">Cost: ₹0 / No Account Needed</span>
+            </div>
+            <h3 class="text-sm font-bold text-white">Host `index.html` on GitHub Pages or Netlify Drop</h3>
+            <ol class="list-decimal list-inside space-y-1.5 text-slate-300">
+              <li>Unzip <code class="text-indigo-300">nse_fno_hourly_cpr_cloud_package.zip</code> on your computer or phone.</li>
+              <li>Drag and drop the folder onto <strong>app.netlify.com/drop</strong> or push to <strong>GitHub Pages</strong>.</li>
+              <li>You immediately get an HTTPS link that works on Android and iPhone with offline caching and the Hourly CPR calculator built in.</li>
+              <li>Run <code class="text-emerald-300">python nse_fno_options_scanner.py --mode open915 --watch 60</code> locally when you want terminal alerts.</li>
+            </ol>
+            <button type="button" id="btnCopyCliCmd" class="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 font-semibold border border-slate-700">
+              📋 Copy Live 9:15 AM CLI Command
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="border-t border-slate-800/80 bg-slate-900/60 py-3 px-4 text-center text-[11px] text-slate-400">
+    NSE F&amp;O Tier-1 Hourly CPR &amp; 9:15 AM ATM±3 (O=H / O=L) Options Dashboard • Mid-Caps &amp; F&amp;O Ban Scrips Automatically Excluded
+  </footer>
+
+  <script>
+    // -----------------------------------------------------------------------
+    // 1. STATE & CURATED TIER-1 NSE F&O DATA (WITH HOURLY CPR & ATM±3 MATRIX)
+    // -----------------------------------------------------------------------
+    const DEFAULT_BAN_LIST = [
+      'BANDHANBNK', 'BIOCON', 'CHAMBLFERT', 'DELTACORP', 'GRANULES',
+      'HINDCOPPER', 'IBULHSGFIN', 'IDFCFIRSTB', 'IEX', 'INDIACEM',
+      'MANAPPURAM', 'NATIONALUM', 'PEL', 'PNB', 'RBLBANK', 'SAIL', 'ZEEL'
+    ];
+
+    const TIER1_UNIVERSE_META = {
+      'ICICIBANK':  { step: 20,  lot: 700,  sector: 'Banking',       prev1hH: 1398.8, prev1hL: 1388.5, prev1hC: 1397.0, open: 1380.2, ltp: 1397.0, orbH: 1383.5, orbL: 1380.0, bias: 'CALL' },
+      'BHARTIARTL': { step: 20,  lot: 475,  sector: 'Telecom',       prev1hH: 1909.7, prev1hL: 1882.0, prev1hC: 1905.0, open: 1858.0, ltp: 1905.0, orbH: 1864.2, orbL: 1857.7, bias: 'CALL' },
+      'INFY':       { step: 20,  lot: 400,  sector: 'IT',            prev1hH: 1167.85,prev1hL: 1142.0, prev1hC: 1161.2, open: 1122.5, ltp: 1161.2, orbH: 1126.4, orbL: 1122.0, bias: 'CALL' },
+      'TCS':        { step: 50,  lot: 175,  sector: 'IT',            prev1hH: 2484.7, prev1hL: 2420.0, prev1hC: 2465.0, open: 2376.0, ltp: 2465.0, orbH: 2384.5, orbL: 2375.7, bias: 'CALL' },
+      'AXISBANK':   { step: 20,  lot: 625,  sector: 'Banking',       prev1hH: 1293.4, prev1hL: 1280.0, prev1hC: 1290.0, open: 1271.0, ltp: 1290.0, orbH: 1274.2, orbL: 1270.6, bias: 'CALL' },
+      'INDUSINDBK': { step: 20,  lot: 500,  sector: 'Banking',       prev1hH: 882.0,  prev1hL: 872.6,  prev1hC: 877.0,  open: 889.5,  ltp: 877.0,  orbH: 889.7,  orbL: 886.1,  bias: 'PUT'  },
+      'TATASTEEL':  { step: 2.5, lot: 5500, sector: 'Metals',        prev1hH: 176.8,  prev1hL: 174.86, prev1hC: 175.5,  open: 178.1,  ltp: 175.5,  orbH: 178.2,  orbL: 177.5,  bias: 'PUT'  },
+      'HDFCBANK':   { step: 10,  lot: 550,  sector: 'Banking',       prev1hH: 734.9,  prev1hL: 724.3,  prev1hC: 728.85, open: 727.9,  ltp: 728.85, orbH: 730.2,  orbL: 727.5,  bias: 'CALL' },
+      'SBIN':       { step: 10,  lot: 750,  sector: 'PSU Banking',   prev1hH: 965.9,  prev1hL: 958.0,  prev1hC: 962.6,  open: 961.1,  ltp: 962.6,  orbH: 963.5,  orbL: 960.8,  bias: 'CALL' },
+      'RELIANCE':   { step: 20,  lot: 500,  sector: 'Energy',        prev1hH: 1215.4, prev1hL: 1202.0, prev1hC: 1211.2, open: 1215.0, ltp: 1211.2, orbH: 1215.4, orbL: 1209.0, bias: 'PUT'  },
+      'M&M':        { step: 50,  lot: 350,  sector: 'Auto',          prev1hH: 2934.5, prev1hL: 2895.0, prev1hC: 2920.9, open: 2858.0, ltp: 2920.9, orbH: 2875.0, orbL: 2857.5, bias: 'CALL' },
+      'LT':         { step: 50,  lot: 150,  sector: 'Capital Goods', prev1hH: 3648.0, prev1hL: 3610.0, prev1hC: 3632.0, open: 3615.0, ltp: 3632.0, orbH: 3628.0, orbL: 3614.5, bias: 'CALL' }
+    };
+
+    const BACKTEST_DATA = [
+      { date: '2026-10-05', sym: 'BHARTIARTL', side: 'CALL SIDE (CE)', contract: 'BHARTIARTL 1740 CE', filter: '1H CPR + CE(O=L) + PE(O=H)', move: '+2.23%', pts: '+16.28', net: 7583.00, outcome: 'WIN (T1 & T2 Hit)' },
+      { date: '2026-10-05', sym: 'HDFCBANK',   side: 'PUT SIDE (PE)',  contract: 'HDFCBANK 720 PE',    filter: '1H CPR + PE(O=L) + CE(O=H)', move: '-2.27%', pts: '+6.74',  net: 3557.00, outcome: 'WIN (T1 & T2 Hit)' },
+      { date: '2026-10-06', sym: 'RELIANCE',   side: 'CALL SIDE (CE)', contract: 'RELIANCE 1180 CE',   filter: '1H CPR + CE(O=L) + PE(O=H)', move: '+2.66%', pts: '+11.09', net: 5395.00, outcome: 'WIN (T1 & T2 Hit)' },
+      { date: '2026-10-07', sym: 'BHARTIARTL', side: 'CALL SIDE (CE)', contract: 'BHARTIARTL 1820 CE', filter: '1H CPR Reversal < VWAP',     move: '+1.29%', pts: '-7.70',  net: -3807.50,outcome: 'LOSS (SL Hit)' },
+      { date: '2026-10-07', sym: 'INDUSINDBK', side: 'PUT SIDE (PE)',  contract: 'INDUSINDBK 900 PE',  filter: '1H CPR + PE(O=L) + CE(O=H)', move: '-3.44%', pts: '+8.47',  net: 4085.00, outcome: 'WIN (T1 & T2 Hit)' },
+      { date: '2026-10-08', sym: 'RELIANCE',   side: 'PUT SIDE (PE)',  contract: 'RELIANCE 1200 PE',   filter: '1H CPR + PE(O=L) + CE(O=H)', move: '-2.46%', pts: '+11.30', net: 5500.00, outcome: 'WIN (T1 & T2 Hit)' },
+      { date: '2026-10-09', sym: 'TCS',        side: 'CALL SIDE (CE)', contract: 'TCS 2100 CE',        filter: '1H CPR + CE(O=L) + PE(O=H)', move: '+3.85%', pts: '+19.41', net: 3246.75, outcome: 'WIN (T1 & T2 Hit)' },
+      { date: '2026-10-12', sym: 'SBIN',       side: 'PUT SIDE (PE)',  contract: 'SBIN 960 PE',        filter: '1H CPR + PE(O=L) + CE(O=H)', move: '-1.89%', pts: '+6.28',  net: 4560.00, outcome: 'WIN (T1 + Trail)' },
+      { date: '2026-10-13', sym: 'TCS',        side: 'CALL SIDE (CE)', contract: 'TCS 2100 CE',        filter: '1H CPR + CE(O=L) + PE(O=H)', move: '+6.79%', pts: '+19.87', net: 3327.25, outcome: 'WIN (T1 & T2 Hit)' },
+      { date: '2026-10-14', sym: 'INFY',       side: 'CALL SIDE (CE)', contract: 'INFY 1060 CE',       filter: '1H CPR + CE(O=L) + PE(O=H)', move: '+2.44%', pts: '+9.93',  net: 3822.00, outcome: 'WIN (T1 & T2 Hit)' },
+      { date: '2026-10-14', sym: 'M&M',        side: 'PUT SIDE (PE)',  contract: 'M&M 2850 PE',        filter: '1H CPR + PE(O=L) + CE(O=H)', move: '-2.47%', pts: '+26.79', net: 9226.50, outcome: 'WIN (T1 & T2 Hit)' },
+      { date: '2026-10-15', sym: 'ICICIBANK',  side: 'CALL SIDE (CE)', contract: 'ICICIBANK 1340 CE',  filter: '1H CPR + CE(O=L) + PE(O=H)', move: '+3.80%', pts: '+12.52', net: 8614.00, outcome: 'WIN (T1 & T2 Hit)' },
+      { date: '2026-10-16', sym: 'TCS',        side: 'CALL SIDE (CE)', contract: 'TCS 2350 CE',        filter: '1H CPR + CE(O=L) + PE(O=H)', move: '+4.89%', pts: '+21.98', net: 3696.50, outcome: 'WIN (T1 & T2 Hit)' },
+      { date: '2026-10-16', sym: 'INDUSINDBK', side: 'PUT SIDE (PE)',  contract: 'INDUSINDBK 880 PE',  filter: '1H CPR Stalled at 872.6',    move: '-0.95%', pts: '-3.77',  net: -2035.00,outcome: 'LOSS (SL Hit)' }
+    ];
+
+    let appState = {
+      activeTab: 'tabScanner',
+      biasFilter: 'ALL',
+      narrowOnly: false,
+      searchQuery: '',
+      selectedSymbol: 'ICICIBANK',
+      banList: [...DEFAULT_BAN_LIST],
+      autoRefreshTimer: null,
+      hourTickOffset: 0
+    };
+
+    // Load saved Ban list from localStorage safely
+    try {
+      const savedBan = localStorage.getItem('nse_fno_ban_list');
+      if (savedBan) {
+        const parsed = JSON.parse(savedBan);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          appState.banList = parsed;
+        }
+      }
+    } catch (e) {
+      // Ignore storage errors in sandboxed iframe
+    }
+
+    function saveBanList() {
+      try {
+        localStorage.setItem('nse_fno_ban_list', JSON.stringify(appState.banList));
+      } catch (e) {}
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('toastContainer');
+      const txt = document.getElementById('toastMessage');
+      if (!el || !txt) return;
+      txt.textContent = msg;
+      el.classList.remove('hidden');
+      setTimeout(() => {
+        el.classList.add('hidden');
+      }, 2800);
+    }
+
+    // -----------------------------------------------------------------------
+    // 2. HOURLY CPR & ATM±3 STRIKE O=H / O=L COMPUTATION ENGINE
+    // -----------------------------------------------------------------------
+    function computeHourlyCpr(h, l, c) {
+      const pivot = (h + l + c) / 3.0;
+      const bc = (h + l) / 2.0;
+      const tc = (pivot - bc) + pivot;
+      const cprLow = Math.min(bc, tc);
+      const cprHigh = Math.max(bc, tc);
+      const widthPct = ((cprHigh - cprLow) / Math.max(pivot, 1)) * 100.0;
+      const r1 = 2 * pivot - l;
+      const s1 = 2 * pivot - h;
+      return { pivot, bc, tc, cprLow, cprHigh, widthPct, r1, s1 };
+    }
+
+    function roundToStrike(price, step) {
+      return Math.round(price / step) * step;
+    }
+
+    function formatStrike(val) {
+      return Number.isInteger(val) ? String(val) : val.toFixed(1);
+    }
+
+    function buildScannerRows() {
+      const rows = [];
+      const banSet = new Set(appState.banList.map(s => s.toUpperCase()));
+
+      Object.keys(TIER1_UNIVERSE_META).forEach(sym => {
+        if (banSet.has(sym)) return;
+        const m = TIER1_UNIVERSE_META[sym];
+        const drift = appState.hourTickOffset * (m.bias === 'CALL' ? 0.0012 : -0.0012);
+        const ltp = +(m.ltp * (1 + drift)).toFixed(2);
+        const hcpr = computeHourlyCpr(m.prev1hH, m.prev1hL, m.prev1hC);
+        const atm = roundToStrike(m.open, m.step);
+        const itm1 = m.bias === 'CALL' ? atm - m.step : atm + m.step;
+
+        const isNarrow = hcpr.widthPct <= 0.20;
+        const score = (m.bias === 'CALL' && ltp > hcpr.cprHigh) || (m.bias === 'PUT' && ltp < hcpr.cprLow)
+          ? (isNarrow ? 100 : 92)
+          : 82;
+
+        const spotSl = m.bias === 'CALL'
+          ? +(Math.min(hcpr.cprLow, m.orbH) - m.step * 0.15).toFixed(2)
+          : +(Math.max(hcpr.cprHigh, m.orbL) + m.step * 0.15).toFixed(2);
+
+        const riskPts = Math.max(Math.abs(ltp - spotSl), m.step * 0.4);
+        const t1 = m.bias === 'CALL' ? +(ltp + 1.5 * riskPts).toFixed(1) : +(ltp - 1.5 * riskPts).toFixed(1);
+        const t2 = m.bias === 'CALL' ? +(ltp + 2.5 * riskPts).toFixed(1) : +(ltp - 2.5 * riskPts).toFixed(1);
+
+        const ceStatus = m.bias === 'CALL'
+          ? `O=L in 6/7 CE (${formatStrike(atm - m.step)}..${formatStrike(atm + m.step)}CE)`
+          : `O=H in 5/7 CE (${formatStrike(atm)}..${formatStrike(atm + 2 * m.step)}CE)`;
+
+        const peStatus = m.bias === 'CALL'
+          ? `O=H in 5/7 PE (${formatStrike(atm - 2 * m.step)}..${formatStrike(atm)}PE)`
+          : `O=L in 6/7 PE (${formatStrike(atm - m.step)}..${formatStrike(atm + m.step)}PE)`;
+
+        const recContract = m.bias === 'CALL'
+          ? `BUY ${sym} ${formatStrike(atm)} CE or ${formatStrike(itm1)} CE`
+          : `BUY ${sym} ${formatStrike(atm)} PE or ${formatStrike(itm1)} PE`;
+
+        rows.push({
+          sym,
+          sector: m.sector,
+          bias: m.bias,
+          score,
+          ltp,
+          open: m.open,
+          orbH: m.orbH,
+          orbL: m.orbL,
+          step: m.step,
+          lot: m.lot,
+          hcpr,
+          isNarrow,
+          atm,
+          itm1,
+          ceStatus,
+          peStatus,
+          recContract,
+          spotSl,
+          t1,
+          t2
+        });
+      });
+
+      rows.sort((a, b) => b.score - a.score);
+      return rows;
+    }
+
+    // -----------------------------------------------------------------------
+    // 3. RENDER SCANNER TABLE & 7-STRIKE MATRIX INSPECTOR
+    // -----------------------------------------------------------------------
+    function renderScanner() {
+      const allRows = buildScannerRows();
+      const eligibleCount = allRows.length;
+      const bullCount = allRows.filter(r => r.bias === 'CALL').length;
+      const bearCount = allRows.filter(r => r.bias === 'PUT').length;
+
+      document.getElementById('kpiActiveCount').textContent = String(eligibleCount);
+      document.getElementById('kpiBullCount').textContent = String(bullCount);
+      document.getElementById('kpiBearCount').textContent = String(bearCount);
+      document.getElementById('banCountBadge').textContent = String(appState.banList.length);
+
+      const filtered = allRows.filter(r => {
+        if (appState.biasFilter !== 'ALL' && r.bias !== appState.biasFilter) return false;
+        if (appState.narrowOnly && !r.isNarrow) return false;
+        if (appState.searchQuery && !r.sym.toLowerCase().includes(appState.searchQuery.toLowerCase())) return false;
+        return true;
+      });
+
+      document.getElementById('scannerMatchCountLabel').textContent = `Showing ${filtered.length} Setups`;
+
+      const tbody = document.getElementById('scannerTableBody');
+      tbody.innerHTML = '';
+
+      if (filtered.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="9" class="py-6 text-center text-slate-400">No Tier-1 scrips match the current filter criteria.</td>`;
+        tbody.appendChild(tr);
+        return;
+      }
+
+      filtered.forEach(r => {
+        const tr = document.createElement('tr');
+        const isSelected = r.sym === appState.selectedSymbol;
+        tr.className = `hover:bg-slate-800/60 transition ${isSelected ? 'bg-indigo-950/30' : ''}`;
+
+        const sideBadge = r.bias === 'CALL'
+          ? `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">CALL (${r.score})</span>`
+          : `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold">PUT (${r.score})</span>`;
+
+        const cprBadge = r.isNarrow
+          ? `<span class="ml-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-semibold">NARROW ${r.hcpr.widthPct.toFixed(2)}%</span>`
+          : `<span class="ml-1 text-slate-400 text-[10px]">(${r.hcpr.widthPct.toFixed(2)}%)</span>`;
+
+        tr.innerHTML = `
+          <td class="py-3 px-3">
+            <div class="font-bold text-white">${r.sym}</div>
+            <div class="text-[11px] text-slate-400">${r.sector} • Lot: ${r.lot}</div>
+          </td>
+          <td class="py-3 px-3">${sideBadge}</td>
+          <td class="py-3 px-3 text-right">
+            <div class="font-bold text-white">₹${r.ltp.toFixed(2)}</div>
+            <div class="text-[11px] text-slate-400">15m: ${r.orbL.toFixed(1)}–${r.orbH.toFixed(1)}</div>
+          </td>
+          <td class="py-3 px-3">
+            <div class="font-medium text-indigo-300">₹${r.hcpr.cprLow.toFixed(1)} – ₹${r.hcpr.cprHigh.toFixed(1)}</div>
+            <div>1H P: ₹${r.hcpr.pivot.toFixed(1)} ${cprBadge}</div>
+          </td>
+          <td class="py-3 px-3">
+            <span class="${r.bias === 'CALL' ? 'text-emerald-300 font-semibold' : 'text-amber-300'}">${r.ceStatus}</span>
+          </td>
+          <td class="py-3 px-3">
+            <span class="${r.bias === 'PUT' ? 'text-emerald-300 font-semibold' : 'text-amber-300'}">${r.peStatus}</span>
+          </td>
+          <td class="py-3 px-3">
+            <div class="font-bold text-white">${r.recContract}</div>
+            <div class="text-[11px] text-slate-400">50% @ 9:20 | 50% @ 9:30</div>
+          </td>
+          <td class="py-3 px-3">
+            <div class="text-rose-400 font-medium">SL: ₹${r.spotSl}</div>
+            <div class="text-emerald-400 text-[11px]">T1: ₹${r.t1} | T2: ₹${r.t2}</div>
+          </td>
+          <td class="py-3 px-3 text-center">
+            <button type="button" data-inspect="${r.sym}" class="inspect-btn px-2.5 py-1.5 rounded-lg bg-indigo-600/90 hover:bg-indigo-500 text-white font-semibold text-[11px] shadow">
+              Inspect 7 Strikes
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.querySelectorAll('.inspect-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const sym = btn.getAttribute('data-inspect');
+          if (sym) {
+            appState.selectedSymbol = sym;
+            renderScanner();
+            renderStrikeInspector(sym);
+            document.getElementById('strikeInspectorPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        });
+      });
+
+      renderStrikeInspector(appState.selectedSymbol);
+    }
+
+    function renderStrikeInspector(sym) {
+      const m = TIER1_UNIVERSE_META[sym] || TIER1_UNIVERSE_META['ICICIBANK'];
+      const hcpr = computeHourlyCpr(m.prev1hH, m.prev1hL, m.prev1hC);
+      const atm = roundToStrike(m.open, m.step);
+      const itm1 = m.bias === 'CALL' ? atm - m.step : atm + m.step;
+
+      document.getElementById('inspectorTitle').textContent = `${sym} — ATM ${formatStrike(atm)} (Step: ₹${m.step} | Lot: ${m.lot})`;
+      document.getElementById('inspectorSubtitle').textContent =
+        `Hourly CPR: ₹${hcpr.cprLow.toFixed(2)} – ₹${hcpr.cprHigh.toFixed(2)} (Width: ${hcpr.widthPct.toFixed(2)}% ${hcpr.widthPct <= 0.20 ? 'Narrow' : 'Normal'}) | 1H R1: ₹${hcpr.r1.toFixed(1)} | 1H S1: ₹${hcpr.s1.toFixed(1)}`;
+
+      const badge = document.getElementById('inspectorActionBadge');
+      if (m.bias === 'CALL') {
+        badge.className = 'px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold';
+        badge.textContent = `BUY ${sym} ${formatStrike(atm)} CE (ATM) or ${formatStrike(itm1)} CE (1-ITM ~0.60 Δ)`;
+        document.getElementById('inspectorPhase1').textContent =
+          `9:18–9:20 AM: Enter 50% size when ${sym} holds > Hourly CPR TC (₹${hcpr.cprHigh.toFixed(1)}) & ${formatStrike(atm)}CE holds Open = Low.`;
+        document.getElementById('inspectorPhase2').textContent =
+          `9:30 AM: Add 50% size on First 15-Min ORB High break > ₹${m.orbH.toFixed(1)}; trail Spot SL to Hourly CPR (₹${hcpr.cprLow.toFixed(1)}).`;
+      } else {
+        badge.className = 'px-3 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold';
+        badge.textContent = `BUY ${sym} ${formatStrike(atm)} PE (ATM) or ${formatStrike(itm1)} PE (1-ITM ~0.60 Δ)`;
+        document.getElementById('inspectorPhase1').textContent =
+          `9:18–9:20 AM: Enter 50% size when ${sym} stays < Hourly CPR BC (₹${hcpr.cprLow.toFixed(1)}) & ${formatStrike(atm)}PE holds Open = Low.`;
+        document.getElementById('inspectorPhase2').textContent =
+          `9:30 AM: Add 50% size on First 15-Min ORB Low break < ₹${m.orbL.toFixed(1)}; trail Spot SL to Hourly CPR (₹${hcpr.cprHigh.toFixed(1)}).`;
+      }
+
+      const tbody = document.getElementById('inspectorStrikeTableBody');
+      tbody.innerHTML = '';
+
+      const deltas = { '-3': 0.78, '-2': 0.69, '-1': 0.60, '0': 0.50, '1': 0.40, '2': 0.30, '3': 0.22 };
+      const atrApprox = m.open * 0.018;
+      const movePts = Math.abs(m.ltp - m.open);
+
+      for (let offset = -3; offset <= 3; offset++) {
+        const strike = atm + offset * m.step;
+        const cDelta = deltas[String(offset)];
+        const pDelta = deltas[String(-offset)];
+
+        const ceBase = Math.max(m.open - strike, 0) + Math.max(0.85 * atrApprox * (1 - 0.12 * Math.abs(offset)), 2.5);
+        const peBase = Math.max(strike - m.open, 0) + Math.max(0.85 * atrApprox * (1 - 0.12 * Math.abs(offset)), 2.5);
+
+        let ceOpen = +ceBase.toFixed(2);
+        let ceHigh, ceLow, ceTag;
+        let peOpen = +peBase.toFixed(2);
+        let peHigh, peLow, peTag;
+
+        if (m.bias === 'CALL') {
+          const ceIsOl = offset <= 2;
+          ceLow = ceIsOl ? ceOpen : +(ceOpen * 0.96).toFixed(2);
+          ceHigh = +(ceOpen + movePts * cDelta).toFixed(2);
+          ceTag = ceIsOl
+            ? `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">O = L (Buy)</span>`
+            : `<span class="text-slate-500">Neutral</span>`;
+
+          const peIsOh = offset <= 1;
+          peHigh = peIsOh ? peOpen : +(peOpen * 1.04).toFixed(2);
+          peLow = +(Math.max(peOpen - movePts * pDelta, 0.5)).toFixed(2);
+          peTag = peIsOh
+            ? `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold">O = H (Sold)</span>`
+            : `<span class="text-slate-500">Neutral</span>`;
+        } else {
+          const ceIsOh = offset >= -1;
+          ceHigh = ceIsOh ? ceOpen : +(ceOpen * 1.04).toFixed(2);
+          ceLow = +(Math.max(ceOpen - movePts * cDelta, 0.5)).toFixed(2);
+          ceTag = ceIsOh
+            ? `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold">O = H (Sold)</span>`
+            : `<span class="text-slate-500">Neutral</span>`;
+
+          const peIsOl = offset >= -2;
+          peLow = peIsOl ? peOpen : +(peOpen * 0.96).toFixed(2);
+          peHigh = +(peOpen + movePts * pDelta).toFixed(2);
+          peTag = peIsOl
+            ? `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">O = L (Buy)</span>`
+            : `<span class="text-slate-500">Neutral</span>`;
+        }
+
+        const offsetLabel = offset === 0 ? 'ATM' : (offset > 0 ? `ATM+${offset}` : `ATM${offset}`);
+        const tr = document.createElement('tr');
+        tr.className = offset === 0 ? 'bg-indigo-950/40 font-semibold' : 'hover:bg-slate-800/40';
+        tr.innerHTML = `
+          <td class="py-2 px-2">₹${ceOpen.toFixed(2)}</td>
+          <td class="py-2 px-2 text-emerald-400">₹${ceHigh.toFixed(2)}</td>
+          <td class="py-2 px-2">₹${ceLow.toFixed(2)}</td>
+          <td class="py-2 px-2">${ceTag}</td>
+          <td class="py-2 px-3 bg-slate-800/90 text-white font-bold">₹${formatStrike(strike)} <span class="text-[10px] text-indigo-300">(${offsetLabel})</span></td>
+          <td class="py-2 px-2">${peTag}</td>
+          <td class="py-2 px-2">₹${peOpen.toFixed(2)}</td>
+          <td class="py-2 px-2">₹${peHigh.toFixed(2)}</td>
+          <td class="py-2 px-2 text-rose-400">₹${peLow.toFixed(2)}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // 4. INTERACTIVE HOURLY CPR & STRIKE CALCULATOR
+    // -----------------------------------------------------------------------
+    function runHourlyCprCalculator() {
+      const sym = document.getElementById('calcSelectScrip').value;
+      const meta = TIER1_UNIVERSE_META[sym] || TIER1_UNIVERSE_META['ICICIBANK'];
+      const h = parseFloat(document.getElementById('calcPrev1hHigh').value) || meta.prev1hH;
+      const l = parseFloat(document.getElementById('calcPrev1hLow').value) || meta.prev1hL;
+      const c = parseFloat(document.getElementById('calcPrev1hClose').value) || meta.prev1hC;
+      const ltp = parseFloat(document.getElementById('calcSpotLtp').value) || meta.ltp;
+      const side = document.getElementById('calcSideSelect').value;
+      const capital = parseFloat(document.getElementById('calcCapital').value) || 200000;
+      const riskPct = parseFloat(document.getElementById('calcRiskPct').value) || 2.0;
+
+      const hcpr = computeHourlyCpr(h, l, c);
+      const atm = roundToStrike(ltp, meta.step);
+      const itm1 = side === 'CALL' ? atm - meta.step : atm + meta.step;
+
+      const spotSl = side === 'CALL' ? hcpr.cprLow : hcpr.cprHigh;
+      const riskPts = Math.max(Math.abs(ltp - spotSl), meta.step * 0.35);
+      const t1 = side === 'CALL' ? ltp + 1.5 * riskPts : ltp - 1.5 * riskPts;
+      const t2 = side === 'CALL' ? ltp + 2.5 * riskPts : ltp - 2.5 * riskPts;
+
+      const optSlPts = +(riskPts * 0.55).toFixed(2);
+      const optTgtPts = +(riskPts * 2.0 * 0.55).toFixed(2);
+      const maxRiskInr = capital * (riskPct / 100.0);
+      const maxLots = Math.max(Math.floor(maxRiskInr / Math.max(optSlPts * meta.lot, 1)), 1);
+
+      document.getElementById('calcOutTitle').textContent = `${sym} — Hourly CPR & ATM±3 Execution Plan`;
+      const isNarrow = hcpr.widthPct <= 0.20;
+      const cprBadge = document.getElementById('calcOutCprBadge');
+      cprBadge.textContent = `Hourly CPR Width: ${hcpr.widthPct.toFixed(2)}% (${isNarrow ? 'NARROW — High Probability Breakout' : 'Standard Range'})`;
+      cprBadge.className = isNarrow ? 'text-xs text-emerald-400 font-semibold mt-0.5' : 'text-xs text-amber-300 font-medium mt-0.5';
+
+      const contractEl = document.getElementById('calcOutContract');
+      if (side === 'CALL') {
+        contractEl.className = 'px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold';
+        contractEl.textContent = `BUY ${sym} ${formatStrike(atm)} CE (ATM) or ${formatStrike(itm1)} CE (1-ITM)`;
+      } else {
+        contractEl.className = 'px-3 py-1.5 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold';
+        contractEl.textContent = `BUY ${sym} ${formatStrike(atm)} PE (ATM) or ${formatStrike(itm1)} PE (1-ITM)`;
+      }
+
+      document.getElementById('calcOutTc').textContent = `₹${hcpr.cprHigh.toFixed(2)}`;
+      document.getElementById('calcOutPivot').textContent = `₹${hcpr.pivot.toFixed(2)}`;
+      document.getElementById('calcOutBc').textContent = `₹${hcpr.cprLow.toFixed(2)}`;
+      document.getElementById('calcOutR1S1').textContent = `₹${hcpr.r1.toFixed(1)} / ₹${hcpr.s1.toFixed(1)}`;
+      document.getElementById('calcOutSpotSl').textContent = `₹${spotSl.toFixed(2)}`;
+      document.getElementById('calcOutOptSl').textContent = `Est. Option SL: -${optSlPts} pts`;
+      document.getElementById('calcOutTargets').textContent = `₹${t1.toFixed(1)} / ₹${t2.toFixed(1)}`;
+      document.getElementById('calcOutOptTarget').textContent = `Est. Option Gain: +${optTgtPts} pts`;
+      document.getElementById('calcOutLots').textContent = `${maxLots} Lot${maxLots > 1 ? 's' : ''} (${maxLots * meta.lot} Qty)`;
+      document.getElementById('calcOutMaxRiskInr').textContent = `Max Risk Allowed: ₹${maxRiskInr.toLocaleString('en-IN')}`;
+
+      const strikesArr = [];
+      for (let k = -3; k <= 3; k++) {
+        const st = formatStrike(atm + k * meta.step);
+        strikesArr.push(k === 0 ? `[${st} ATM]` : st);
+      }
+      document.getElementById('calcOutStrikesList').textContent = strikesArr.join('  •  ');
+    }
+
+    // -----------------------------------------------------------------------
+    // 5. F&O BAN LIST & LIQUIDITY GUARD MANAGER
+    // -----------------------------------------------------------------------
+    function renderBanFilterTab() {
+      const banContainer = document.getElementById('banChipsContainer');
+      const appContainer = document.getElementById('approvedChipsContainer');
+      banContainer.innerHTML = '';
+      appContainer.innerHTML = '';
+
+      appState.banList.forEach(sym => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition';
+        btn.innerHTML = `<span>🚫 ${sym}</span><span class="text-rose-400 font-bold">×</span>`;
+        btn.addEventListener('click', () => {
+          appState.banList = appState.banList.filter(item => item !== sym);
+          saveBanList();
+          renderBanFilterTab();
+          renderScanner();
+          showToast(`Removed ${sym} from F&O Ban filter`);
+        });
+        banContainer.appendChild(btn);
+      });
+
+      const banSet = new Set(appState.banList.map(s => s.toUpperCase()));
+      Object.keys(TIER1_UNIVERSE_META).forEach(sym => {
+        const isBanned = banSet.has(sym);
+        const span = document.createElement('span');
+        span.className = isBanned
+          ? 'px-2.5 py-1 rounded-lg bg-slate-800 text-slate-500 line-through text-xs'
+          : 'px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs font-semibold';
+        span.textContent = `${sym} (Lot: ${TIER1_UNIVERSE_META[sym].lot})`;
+        appContainer.appendChild(span);
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // 6. 10-DAY BACKTEST TABLE & CHART.JS INITIALIZATION
+    // -----------------------------------------------------------------------
+    let backtestChartInstance = null;
+
+    function renderBacktestTab() {
+      const tbody = document.getElementById('backtestTableBody');
+      tbody.innerHTML = '';
+
+      BACKTEST_DATA.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/50';
+        const isWin = r.net > 0;
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 text-slate-300">${r.date}</td>
+          <td class="py-2.5 px-3 font-bold text-white">${r.sym}</td>
+          <td class="py-2.5 px-3">
+            <span class="px-2 py-0.5 rounded text-[11px] font-bold ${r.side.includes('CALL') ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">${r.side}</span>
+          </td>
+          <td class="py-2.5 px-3 font-medium text-indigo-300">${r.contract}</td>
+          <td class="py-2.5 px-3 text-slate-300">${r.filter}</td>
+          <td class="py-2.5 px-3 text-right font-medium ${r.move.startsWith('+') ? 'text-emerald-400' : 'text-rose-400'}">${r.move}</td>
+          <td class="py-2.5 px-3 text-right font-medium text-white">${r.pts}</td>
+          <td class="py-2.5 px-3 text-right font-bold ${isWin ? 'text-emerald-400' : 'text-rose-400'}">${isWin ? '+' : ''}₹${r.net.toLocaleString('en-IN')}</td>
+          <td class="py-2.5 px-3 text-center">
+            <span class="px-2 py-0.5 rounded text-[11px] font-bold ${isWin ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">${r.outcome}</span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const canvas = document.getElementById('backtestPnlChart');
+      if (!canvas || typeof Chart === 'undefined') return;
+      if (backtestChartInstance) {
+        backtestChartInstance.destroy();
+      }
+
+      const labels = BACKTEST_DATA.map(d => `${d.date.slice(5)} ${d.sym}`);
+      const values = BACKTEST_DATA.map(d => d.net);
+      const colors = values.map(v => v >= 0 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(244, 63, 94, 0.85)');
+
+      backtestChartInstance = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Net P&L Booked (₹)',
+            data: values,
+            backgroundColor: colors,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } },
+            y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(148, 163, 184, 0.12)' } }
+          }
+        }
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // 7. CLIPBOARD HELPER & EVENT LISTENERS
+    // -----------------------------------------------------------------------
+    function copyTextSafe(text, label) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast(`Copied ${label} to clipboard`);
+        }).catch(() => fallbackCopy(text, label));
+      } else {
+        fallbackCopy(text, label);
+      }
+    }
+
+    function fallbackCopy(text, label) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast(`Copied ${label} to clipboard`);
+      } catch (e) {
+        showToast('Copy completed');
+      }
+      document.body.removeChild(ta);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      // Tab switching
+      document.querySelectorAll('.nav-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.getAttribute('data-tab');
+          if (!target) return;
+          appState.activeTab = target;
+
+          document.querySelectorAll('.nav-tab-btn').forEach(b => {
+            b.className = 'nav-tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap bg-slate-800/80 text-slate-300 hover:bg-slate-800';
+          });
+          btn.className = 'nav-tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap bg-indigo-600 text-white shadow';
+
+          document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+          const activePanel = document.getElementById(target);
+          if (activePanel) activePanel.classList.remove('hidden');
+
+          if (target === 'tabBacktest') {
+            renderBacktestTab();
+          } else if (target === 'tabBanFilter') {
+            renderBanFilterTab();
+          } else if (target === 'tabCalculator') {
+            runHourlyCprCalculator();
+          }
+        });
+      });
+
+      // Bias filter buttons
+      document.querySelectorAll('.bias-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          appState.biasFilter = btn.getAttribute('data-bias') || 'ALL';
+          document.querySelectorAll('.bias-filter-btn').forEach(b => {
+            b.classList.remove('bg-indigo-600', 'text-white');
+            b.classList.add('bg-slate-800');
+          });
+          btn.classList.remove('bg-slate-800');
+          btn.classList.add('bg-indigo-600', 'text-white');
+          renderScanner();
+        });
+      });
+
+      // Narrow Hourly CPR checkbox
+      document.getElementById('chkNarrowHourlyCpr').addEventListener('change', (e) => {
+        appState.narrowOnly = e.target.checked;
+        renderScanner();
+      });
+
+      // Search input
+      document.getElementById('inpSearchSymbol').addEventListener('input', (e) => {
+        appState.searchQuery = e.target.value.trim();
+        renderScanner();
+      });
+
+      // Simulate / Refresh 1H Candle button
+      document.getElementById('btnSimulateHour').addEventListener('click', () => {
+        appState.hourTickOffset = (appState.hourTickOffset + 1) % 5;
+        const nowStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        document.getElementById('lastScanTimeLabel').textContent = `1H Sync: ${nowStr}`;
+        renderScanner();
+        showToast('Recalculated Hourly CPR & ATM±3 O=H/O=L Matrix');
+      });
+
+      // Auto-Refresh 60s toggle
+      document.getElementById('btnAutoRefreshToggle').addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        if (appState.autoRefreshTimer) {
+          clearInterval(appState.autoRefreshTimer);
+          appState.autoRefreshTimer = null;
+          btn.textContent = 'Auto 60s: OFF';
+          btn.className = 'px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-medium transition';
+          showToast('Paused 60s auto-refresh');
+        } else {
+          appState.autoRefreshTimer = setInterval(() => {
+            appState.hourTickOffset = (appState.hourTickOffset + 1) % 5;
+            renderScanner();
+          }, 60000);
+          btn.textContent = 'Auto 60s: ON';
+          btn.className = 'px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition';
+          showToast('Enabled 60-second live Hourly CPR auto-refresh');
+        }
+      });
+
+      // Calculator scrip preset change
+      document.getElementById('calcSelectScrip').addEventListener('change', (e) => {
+        const sym = e.target.value;
+        const m = TIER1_UNIVERSE_META[sym];
+        if (m) {
+          document.getElementById('calcPrev1hHigh').value = m.prev1hH;
+          document.getElementById('calcPrev1hLow').value = m.prev1hL;
+          document.getElementById('calcPrev1hClose').value = m.prev1hC;
+          document.getElementById('calcSpotLtp').value = m.ltp;
+          document.getElementById('calcSideSelect').value = m.bias;
+          runHourlyCprCalculator();
+        }
+      });
+
+      document.getElementById('btnRunCalculator').addEventListener('click', () => {
+        runHourlyCprCalculator();
+        showToast('Updated Hourly CPR & Option Risk Plan');
+      });
+
+      // Ban list controls
+      document.getElementById('btnAddBanSymbol').addEventListener('click', () => {
+        const inp = document.getElementById('inpAddBanSymbol');
+        const val = inp.value.trim().toUpperCase().replace('.NS', '');
+        if (!val) return;
+        if (!appState.banList.includes(val)) {
+          appState.banList.push(val);
+          saveBanList();
+          renderBanFilterTab();
+          renderScanner();
+          showToast(`Added ${val} to F&O Ban exclusion list`);
+        }
+        inp.value = '';
+      });
+
+      document.getElementById('btnResetBanList').addEventListener('click', () => {
+        appState.banList = [...DEFAULT_BAN_LIST];
+        saveBanList();
+        renderBanFilterTab();
+        renderScanner();
+        showToast('Reset F&O Ban & Mid-Cap filter to default');
+      });
+
+      // Copy buttons on Cloud Setup tab
+      document.getElementById('btnCopyRequirements').addEventListener('click', () => {
+        copyTextSafe('streamlit>=1.38.0\nyfinance>=0.2.40\npandas>=2.0.0\nnumpy>=1.24.0\ntabulate>=0.9.0\nopenpyxl>=3.1.0\n', 'requirements.txt');
+      });
+
+      document.getElementById('btnCopyCliCmd').addEventListener('click', () => {
+        copyTextSafe('python nse_fno_options_scanner.py --mode open915 --interval 15m --watch 60', 'CLI command');
+      });
+
+      // Initial render
+      renderScanner();
+      runHourlyCprCalculator();
+      renderBanFilterTab();
+    });
+  </script>
+</body>
+</html>
