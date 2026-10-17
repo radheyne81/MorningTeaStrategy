@@ -1,9 +1,0 @@
-{
-  "name": "NSE F&O Hourly CPR + 9:15 AM OHOL Scanner",
-  "short_name": "NSE Hourly CPR",
-  "start_url": "./index.html",
-  "display": "standalone",
-  "background_color": "#090d16",
-  "theme_color": "#10b981",
-  "description": "Institutional NSE F&O Tier-1 Options Scanner with Hourly CPR, 9:15 AM Opening Drive, ATM±3 O=H/O=L Matrix & F&O Ban Filter."
-}
